@@ -350,11 +350,7 @@ def reset_text(value: str | None, now: datetime) -> str | None:
     days, rest = divmod(remaining, 86_400)
     hours, rest = divmod(rest, 3_600)
     minutes, seconds = divmod(rest, 60)
-    if days:
-        return f"In {days} {'day' if days == 1 else 'days'} · {hours} hr."
-    if hours:
-        return f"In {hours} hr. · {minutes} min."
-    return f"In {minutes} min. · {seconds} sec."
+    return f"In {days:02d}d {hours:02d}h {minutes:02d}m {seconds:02d}s"
 
 
 def progress_bar(percent: float) -> str:

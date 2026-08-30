@@ -78,7 +78,7 @@ class AiStatusTests(unittest.TestCase):
         self.assertEqual(format_number(63.5), "63.5")
         self.assertEqual(progress_bar(120), "[####################]")
         now = datetime.fromisoformat("2026-08-30T12:00:00+00:00")
-        self.assertEqual(reset_text("2026-08-30T14:18:15Z", now), "In 2 hr. · 18 min.")
+        self.assertEqual(reset_text("2026-08-30T14:18:15Z", now), "In 00d 02h 18m 15s")
 
 
 if __name__ == "__main__":

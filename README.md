@@ -31,15 +31,15 @@ AI status monitor started · Ctrl-C to exit
 AI limits · 2026-08-30 15:15:20 CEST
 
 [codex1] · Codex
-  5-hour limit             24 / 100 % [#####---------------] · In 52 min. · 0 sec.
-  Weekly limit              4 / 100 % [#-------------------] · In 6 days · 19 hr.
+  5-hour limit             24 / 100 % [#####---------------] · In 00d 00h 52m 00s
+  Weekly limit              4 / 100 % [#-------------------] · In 06d 19h 00m 00s
 
 [codex2] · Codex
-  5-hour limit              0 / 100 % [--------------------] · In 2 hr. · 27 min.
-  Weekly limit               0 / 100 % [--------------------] · In 6 days · 21 hr.
+  5-hour limit              0 / 100 % [--------------------] · In 00d 02h 27m 00s
+  Weekly limit               0 / 100 % [--------------------] · In 06d 21h 00m 00s
 
 [copilot] · GitHub Copilot
-  Premium interactions     25,000 / 25,000 Credits [####################] · CRITICAL · In 1 day · 8 hr.
+  Premium interactions     25,000 / 25,000 Credits [####################] · CRITICAL · In 01d 08h 00m 00s
 ```
 
 Tests:
