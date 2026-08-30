@@ -410,9 +410,23 @@ def render_results(results: list[UsageResult]) -> str:
 
 def show_results(results: list[UsageResult]) -> None:
     if sys.stdout.isatty():
-        sys.stdout.write("\033[2J\033[H")
+        sys.stdout.write("\033[H\033[J")
     sys.stdout.write(render_results(results) + "\n")
     sys.stdout.flush()
+
+
+def enter_live_screen() -> bool:
+    if not sys.stdout.isatty():
+        return False
+    sys.stdout.write("\033[?1049h\033[?25l\033[H\033[J")
+    sys.stdout.flush()
+    return True
+
+
+def leave_live_screen(active: bool) -> None:
+    if active:
+        sys.stdout.write("\033[?25h\033[?1049l")
+        sys.stdout.flush()
 
 
 def main() -> int:
@@ -427,6 +441,7 @@ def main() -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
 
+    live_screen = enter_live_screen()
     print("AI status monitor started · Ctrl-C to exit", flush=True)
     try:
         while True:
@@ -447,6 +462,8 @@ def main() -> int:
     except KeyboardInterrupt:
         print("\nDone.")
         return 0
+    finally:
+        leave_live_screen(live_screen)
 
 
 if __name__ == "__main__":

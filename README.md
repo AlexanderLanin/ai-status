@@ -11,7 +11,7 @@ The arguments are local executable or alias names. They are used only to discove
 - a Codex alias can set `CODEX_HOME`, for example `~/.codex-account1`
 - a Copilot executable selects the GitHub Copilot endpoint and uses the local GitHub CLI login
 
-The tool reads Codex `auth.json` files and asks the usage endpoints directly. Tokens and account data are never printed or saved. Checks run in parallel every 30 seconds. In a terminal, the display redraws every second so reset countdowns stay current.
+The tool reads Codex `auth.json` files and asks the usage endpoints directly. Tokens and account data are never printed or saved. Checks run in parallel every 30 seconds. In a terminal, it uses a separate live screen and redraws every second so reset countdowns stay current.
 
 ## Run from GitHub with uvx
 
