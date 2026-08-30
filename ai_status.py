@@ -389,15 +389,7 @@ def format_result(result: UsageResult, now: datetime) -> str:
     return "\n".join(lines)
 
 
-def poll_and_print(targets: list[Target]) -> None:
-    now = datetime.now().astimezone()
-    provider_word = "provider" if len(targets) == 1 else "providers"
-    print(f"\nAI limits · {now:%Y-%m-%d %H:%M:%S %Z}")
-    print(
-        f"{len(targets)} {provider_word} checked in parallel · "
-        f"next check in {POLL_INTERVAL_SECONDS:g} s ...",
-        flush=True,
-    )
+def collect_results(targets: list[Target]) -> list[UsageResult]:
     with ThreadPoolExecutor(max_workers=len(targets)) as executor:
         futures = {executor.submit(collect_usage, target): index for index, target in enumerate(targets)}
         results: list[UsageResult | None] = [None] * len(targets)
@@ -408,11 +400,22 @@ def poll_and_print(targets: list[Target]) -> None:
                 results[index] = future.result()
             except Exception:
                 results[index] = UsageResult(target, error="unexpected error")
+    return [result for result in results if result is not None]
 
+
+def render_results(results: list[UsageResult]) -> str:
+    now = datetime.now().astimezone()
+    lines = [f"AI limits · {now:%Y-%m-%d %H:%M:%S %Z}", ""]
     for result in results:
-        if result is not None:
-            print(format_result(result, now))
-            print()
+        lines.append(format_result(result, now))
+        lines.append("")
+    return "\n".join(lines).rstrip()
+
+
+def show_results(results: list[UsageResult]) -> None:
+    if sys.stdout.isatty():
+        sys.stdout.write("\033[2J\033[H")
+    sys.stdout.write(render_results(results) + "\n")
     sys.stdout.flush()
 
 
@@ -432,7 +435,16 @@ def main() -> int:
     try:
         while True:
             started = time.monotonic()
-            poll_and_print(targets)
+            results = collect_results(targets)
+            if sys.stdout.isatty():
+                while True:
+                    show_results(results)
+                    remaining = POLL_INTERVAL_SECONDS - (time.monotonic() - started)
+                    if remaining <= 0:
+                        break
+                    time.sleep(min(1.0, remaining))
+                continue
+            show_results(results)
             remaining = POLL_INTERVAL_SECONDS - (time.monotonic() - started)
             if remaining > 0:
                 time.sleep(remaining)

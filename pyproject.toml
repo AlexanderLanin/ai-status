@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-status"
-version = "0.3.0"
+version = "0.3.1"
 description = "Console monitor for Copilot and Codex usage limits"
 readme = "README.md"
 requires-python = ">=3.10"
