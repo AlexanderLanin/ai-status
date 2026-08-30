@@ -1,18 +1,20 @@
 # ai-status
 
-Small command line tool for AI usage limits. It checks Codex 1, Codex 2, and GitHub Copilot in parallel every 30 seconds.
-
-```bash
-python3 ai_status.py codex1 codex2 copilot
-```
-
-Or run it directly from this folder:
+Small command line tool that runs `/status` for local commands and Bash aliases every 30 seconds.
 
 ```bash
 ./ai-status codex1 codex2 copilot
 ```
 
-The names select the providers to check. Supported names are `codex1`, `codex2`, and `copilot`. If you give no names, all three are checked. The default Codex profile paths are `~/.codex-account1` and `~/.codex-account2`. You can change them with `CODEX1_HOME` and `CODEX2_HOME`.
+Each argument is treated as a command or Bash alias. The tool calls it as `<argument> /status`. Commands run in parallel and are printed in the same order as the arguments.
+
+Aliases must be available from your `.bashrc`. You can also pass a command with arguments by quoting it:
+
+```bash
+./ai-status "codex --profile work" copilot
+```
+
+The request timeout is fixed at 10 seconds. The check interval is fixed at 30 seconds. Press `Ctrl-C` to stop.
 
 ## Run from GitHub with uvx
 
@@ -22,29 +24,29 @@ Install [uv](https://docs.astral.sh/uv/getting-started/installation/) first. The
 uvx --from git+https://github.com/AlexanderLanin/ai-status.git ai-status codex1 codex2 copilot
 ```
 
-`uvx` builds the package in a temporary environment and runs it. The monitor keeps running until you press `Ctrl-C`.
+`uvx` builds the package in a temporary environment and runs it. No clone is needed.
 
 Example output:
 
 ```text
 AI status monitor started · Ctrl-C to exit
 
-AI limits · 2026-08-30 15:15:20 CEST
-Status updated · next check in 30 s · selected providers checked in parallel ...
+AI status · 2026-08-30 15:15:20 CEST
+3 command(s) checked in parallel · next check in 30 s ...
 
-Codex 1
-  5-hour limit              24 / 100 % [#####---------------] · In 52 min. · 0 sec.
-  Weekly limit                4 / 100 % [#-------------------] · In 6 days · 19 hr.
+[codex1]
+  5-hour limit: 24 / 100 %
+  Weekly limit: 4 / 100 %
 
-Codex 2
-  5-hour limit               0 / 100 % [--------------------] · In 2 hr. · 27 min.
-  Weekly limit                0 / 100 % [--------------------] · In 6 days · 21 hr.
+[codex2]
+  5-hour limit: 0 / 100 %
+  Weekly limit: 0 / 100 %
 
-GitHub Copilot
-  Premium interactions     25,000 / 25,000 Credits [####################] · CRITICAL · In 1 day · 8 hr.
+[copilot]
+  Premium interactions: 25,000 / 25,000 Credits
 ```
 
-Like the web app, Copilot shows only `Premium interactions`. Codex shows the 5-hour and weekly limits with usage, a progress bar, and the time until reset on the same line. Providers are always printed in the same order, so 30-second snapshots are easy to compare. Tokens are used only in memory for the request. They are never printed or saved.
+The output from each command is shown with terminal control codes removed. Use trusted local commands only because their output may contain sensitive data.
 
 Tests:
 

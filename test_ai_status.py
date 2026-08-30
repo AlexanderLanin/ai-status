@@ -1,97 +1,31 @@
 import unittest
-from datetime import datetime
 
-from ai_status import (
-    UsageError,
-    format_number,
-    parse_codex_usage,
-    parse_copilot_usage,
-    progress_bar,
-    reset_text,
-    select_providers,
-)
+from ai_status import CommandResult, decode_output, format_result, run_status
 
 
 class AiStatusTests(unittest.TestCase):
-    def test_parses_codex_windows_and_reset(self):
-        windows = parse_codex_usage(
-            {
-                "rate_limit": {
-                    "primary_window": {
-                        "used_percent": 63.5,
-                        "limit_window_seconds": 18_000,
-                        "reset_at": 1_800_000_000,
-                    },
-                    "secondary_window": {
-                        "used_percent": 25,
-                        "limit_window_seconds": 604_800,
-                        "reset_at": 1_800_100_000,
-                    },
-                }
-            }
-        )
-        self.assertEqual([window.label for window in windows], ["5-hour limit", "Weekly limit"])
-        self.assertEqual(windows[0].used, 63.5)
-        self.assertEqual(windows[0].used_percent, 63.5)
-        self.assertEqual(windows[0].reset_at, "2027-01-15T08:00:00Z")
+    def test_runs_command_with_status(self):
+        result = run_status("printf '%s'")
 
-    def test_parses_copilot_credits_and_unlimited_quota(self):
-        windows = parse_copilot_usage(
-            {
-                "quota_reset_date": "2026-09-01",
-                "quota_snapshots": {
-                    "chat": {
-                        "unlimited": True,
-                        "percent_remaining": 100,
-                        "credits_used": 0,
-                        "entitlement": 0,
-                        "quota_reset_at": 0,
-                    },
-                    "premium_interactions": {
-                        "unlimited": False,
-                        "percent_remaining": 27.8,
-                        "credits_used": 18046,
-                        "entitlement": 25000,
-                        "quota_reset_at": 0,
-                    },
-                },
-            }
-        )
-        self.assertEqual(windows[0].id, "premium_interactions")
-        self.assertEqual(windows[0].used, 18046)
-        self.assertEqual(windows[0].limit, 25000)
-        self.assertEqual(windows[0].used_percent, 72.2)
-        self.assertTrue(windows[1].unlimited)
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(result.output, "/status")
 
-    def test_rejects_incomplete_responses(self):
-        with self.assertRaisesRegex(UsageError, "no rate limits"):
-            parse_codex_usage({})
-        with self.assertRaisesRegex(UsageError, "no quotas"):
-            parse_copilot_usage({})
+    def test_reports_failed_command(self):
+        result = run_status("false")
 
-    def test_formats_numbers_and_progress(self):
-        self.assertEqual(format_number(18046), "18,046")
-        self.assertEqual(format_number(63.5), "63.5")
-        self.assertEqual(progress_bar(120), "[####################]")
+        self.assertEqual(result.exit_code, 1)
+        self.assertIsNone(result.error)
+        self.assertIn("Exit code: 1", format_result(result))
 
-    def test_formats_countdown(self):
-        now = datetime.fromisoformat("2026-08-30T12:00:00+00:00")
-        self.assertEqual(
-            reset_text("2026-08-30T14:18:15Z", now),
-            "In 2 hr. · 18 min.",
-        )
+    def test_formats_empty_output(self):
+        result = CommandResult("example", exit_code=0)
 
-    def test_selects_requested_providers(self):
-        self.assertEqual(
-            select_providers(["codex1", "copilot"]),
-            ("codex1", "copilot"),
-        )
-        self.assertEqual(
-            select_providers([]),
-            ("codex1", "codex2", "copilot"),
-        )
-        with self.assertRaisesRegex(ValueError, "unknown provider"):
-            select_providers(["claude"])
+        self.assertEqual(format_result(result), "[example]\n  No output.")
+
+    def test_removes_terminal_control_codes(self):
+        output = decode_output([b"\x1b[31mstatus\x1b[0m\r\n"])
+
+        self.assertEqual(output, "status")
 
 
 if __name__ == "__main__":
