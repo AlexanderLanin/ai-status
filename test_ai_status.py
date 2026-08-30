@@ -3,7 +3,7 @@ from datetime import datetime
 
 from ai_status import (
     UsageError,
-    german_number,
+    format_number,
     parse_codex_usage,
     parse_copilot_usage,
     progress_bar,
@@ -29,7 +29,7 @@ class AiStatusTests(unittest.TestCase):
                 }
             }
         )
-        self.assertEqual([window.label for window in windows], ["5-Stunden-Limit", "Wochenlimit"])
+        self.assertEqual([window.label for window in windows], ["5-hour limit", "Weekly limit"])
         self.assertEqual(windows[0].used, 63.5)
         self.assertEqual(windows[0].used_percent, 63.5)
         self.assertEqual(windows[0].reset_at, "2027-01-15T08:00:00Z")
@@ -63,21 +63,21 @@ class AiStatusTests(unittest.TestCase):
         self.assertTrue(windows[1].unlimited)
 
     def test_rejects_incomplete_responses(self):
-        with self.assertRaisesRegex(UsageError, "keine Rate-Limits"):
+        with self.assertRaisesRegex(UsageError, "no rate limits"):
             parse_codex_usage({})
-        with self.assertRaisesRegex(UsageError, "keine Quoten"):
+        with self.assertRaisesRegex(UsageError, "no quotas"):
             parse_copilot_usage({})
 
-    def test_formats_german_numbers_and_progress(self):
-        self.assertEqual(german_number(18046), "18.046")
-        self.assertEqual(german_number(63.5), "63,5")
+    def test_formats_numbers_and_progress(self):
+        self.assertEqual(format_number(18046), "18,046")
+        self.assertEqual(format_number(63.5), "63.5")
         self.assertEqual(progress_bar(120), "[####################]")
 
     def test_formats_countdown(self):
         now = datetime.fromisoformat("2026-08-30T12:00:00+00:00")
         self.assertEqual(
             reset_text("2026-08-30T14:18:15Z", now),
-            "Noch 2 Std. · 18 Min.",
+            "In 2 hr. · 18 min.",
         )
 
 

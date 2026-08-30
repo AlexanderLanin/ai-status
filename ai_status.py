@@ -85,7 +85,7 @@ def parse_codex_usage(data: object) -> list[UsageWindow]:
     root = as_record(data)
     rate_limit = as_record(root.get("rate_limit") if root else None)
     if rate_limit is None:
-        raise UsageError("Codex-Antwort enthält keine Rate-Limits")
+        raise UsageError("Codex response has no rate limits")
 
     windows: list[UsageWindow] = []
     for window_id, key in (("primary", "primary_window"), ("secondary", "secondary_window")):
@@ -95,13 +95,13 @@ def parse_codex_usage(data: object) -> list[UsageWindow]:
         seconds = finite_number(window.get("limit_window_seconds"))
         used_percent = finite_number(window.get("used_percent"))
         if seconds is None or used_percent is None:
-            raise UsageError(f"Codex-{window_id}-Limit ist unvollständig")
+            raise UsageError(f"Codex {window_id} limit is incomplete")
         if seconds == 18_000:
-            label = "5-Stunden-Limit"
+            label = "5-hour limit"
         elif seconds == 604_800:
-            label = "Wochenlimit"
+            label = "Weekly limit"
         else:
-            label = f"Limit ({round(seconds / 60):g} Minuten)"
+            label = f"Limit ({round(seconds / 60):g} minutes)"
         used = clamp_percent(used_percent)
         windows.append(
             UsageWindow(
@@ -119,9 +119,9 @@ def parse_codex_usage(data: object) -> list[UsageWindow]:
 
 
 COPILOT_LABELS = {
-    "premium_interactions": "Premium-Interaktionen",
+    "premium_interactions": "Premium interactions",
     "chat": "Chat",
-    "completions": "Code-Vervollständigungen",
+    "completions": "Code completions",
 }
 
 
@@ -129,7 +129,7 @@ def parse_copilot_usage(data: object) -> list[UsageWindow]:
     root = as_record(data)
     snapshots = as_record(root.get("quota_snapshots") if root else None)
     if root is None or snapshots is None:
-        raise UsageError("Copilot-Antwort enthält keine Quoten")
+        raise UsageError("Copilot response has no quotas")
 
     fallback_reset = root.get("quota_reset_date")
     fallback_reset = fallback_reset if isinstance(fallback_reset, str) else None
@@ -137,7 +137,7 @@ def parse_copilot_usage(data: object) -> list[UsageWindow]:
     for key, raw in snapshots.items():
         quota = as_record(raw)
         if quota is None:
-            raise UsageError(f"Copilot-Quote {key} ist ungültig")
+            raise UsageError(f"Copilot quota {key} is invalid")
         unlimited = quota.get("unlimited") is True
         entitlement = finite_number(quota.get("entitlement"))
         credits_used = finite_number(quota.get("credits_used"))
@@ -177,28 +177,28 @@ def fetch_json(url: str, headers: Mapping[str, str], timeout: float) -> object:
     except HTTPError as exc:
         raise UsageError(f"HTTP {exc.code}") from None
     except (TimeoutError, socket.timeout):
-        raise UsageError(f"Netzwerk-Timeout nach {timeout:g} s") from None
+        raise UsageError(f"Network timeout after {timeout:g} s") from None
     except URLError:
-        raise UsageError("Netzwerkfehler") from None
+        raise UsageError("Network error") from None
     except (UnicodeDecodeError, json.JSONDecodeError):
-        raise UsageError("ungültige JSON-Antwort") from None
+        raise UsageError("Invalid JSON response") from None
 
 
 def read_codex_access(home: Path, label: str) -> tuple[str, str]:
     try:
         auth = as_record(json.loads((home / "auth.json").read_text(encoding="utf-8")))
     except FileNotFoundError:
-        raise UsageError(f"{label}-Anmeldung fehlt") from None
+        raise UsageError(f"{label} login is missing") from None
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        raise UsageError(f"{label}-Anmeldung kann nicht gelesen werden") from None
+        raise UsageError(f"Cannot read {label} login") from None
 
     tokens = as_record(auth.get("tokens") if auth else None)
     access_token = tokens.get("access_token") if tokens else None
     account_id = tokens.get("account_id") if tokens else None
     if not isinstance(access_token, str) or not access_token:
-        raise UsageError(f"{label}-Anmeldung fehlt")
+        raise UsageError(f"{label} login is missing")
     if not isinstance(account_id, str) or not account_id:
-        raise UsageError(f"{label}-Anmeldung enthält keine Account-ID")
+        raise UsageError(f"{label} login has no account ID")
     return access_token, account_id
 
 
@@ -231,13 +231,13 @@ def copilot_token(timeout: float) -> str:
             timeout=min(5.0, timeout),
         )
     except FileNotFoundError:
-        raise UsageError("GitHub CLI `gh` nicht gefunden") from None
+        raise UsageError("GitHub CLI `gh` was not found") from None
     except subprocess.TimeoutExpired:
-        raise UsageError("GitHub-CLI-Anmeldung antwortet nicht") from None
+        raise UsageError("GitHub CLI login did not respond") from None
     except OSError:
-        raise UsageError("GitHub-CLI-Anmeldung konnte nicht gelesen werden") from None
+        raise UsageError("Could not read GitHub CLI login") from None
     if completed.returncode != 0 or not completed.stdout.strip():
-        raise UsageError("GitHub-CLI-Anmeldung fehlt")
+        raise UsageError("GitHub CLI login is missing")
     return completed.stdout.strip()
 
 
@@ -260,18 +260,18 @@ def collect_copilot(timeout: float) -> ProviderResult:
 
 
 def profile_home(name: str, default_name: str) -> Path:
-    configured = os.environ.get(name) or os.environ.get(f"KI_STATUS_{name}")
+    configured = os.environ.get(name) or os.environ.get(f"AI_STATUS_{name}")
     return Path(configured).expanduser() if configured else Path.home() / default_name
 
 
-def german_number(value: float | None) -> str:
+def format_number(value: float | None) -> str:
     if value is None:
         return "–"
     rounded = round(value, 1)
     raw = str(int(rounded)) if rounded.is_integer() else f"{rounded:.1f}"
     whole, _, fraction = raw.partition(".")
-    grouped = f"{int(whole):,}".replace(",", ".")
-    return f"{grouped},{fraction}" if fraction else grouped
+    grouped = f"{int(whole):,}"
+    return f"{grouped}.{fraction}" if fraction else grouped
 
 
 def reset_datetime(value: str) -> datetime | None:
@@ -292,17 +292,17 @@ def reset_text(value: str | None, now: datetime) -> str | None:
         return None
     remaining = int((reset - now).total_seconds())
     if remaining <= 0:
-        countdown = "Reset ist fällig"
+        countdown = "Reset is due"
     else:
         days, rest = divmod(remaining, 86_400)
         hours, rest = divmod(rest, 3_600)
         minutes, seconds = divmod(rest, 60)
         if days:
-            countdown = f"Noch {days} {'Tag' if days == 1 else 'Tage'} · {hours} Std."
+            countdown = f"In {days} {'day' if days == 1 else 'days'} · {hours} hr."
         elif hours:
-            countdown = f"Noch {hours} Std. · {minutes} Min."
+            countdown = f"In {hours} hr. · {minutes} min."
         else:
-            countdown = f"Noch {minutes} Min. · {seconds} Sek."
+            countdown = f"In {minutes} min. · {seconds} sec."
     return countdown
 
 
@@ -314,11 +314,11 @@ def progress_bar(percent: float) -> str:
 
 def format_window(window: UsageWindow, now: datetime) -> list[str]:
     if window.unlimited:
-        return [f"  {window.label:<24} Unbegrenzt"]
+        return [f"  {window.label:<24} Unlimited"]
 
-    line = f"  {window.label:<24} {german_number(window.used)} / {german_number(window.limit)} {window.unit}"
+    line = f"  {window.label:<24} {format_number(window.used)} / {format_number(window.limit)} {window.unit}"
     if window.used_percent is not None:
-        severity = " · KRITISCH" if window.used_percent >= 95 else " · WARNUNG" if window.used_percent >= 80 else ""
+        severity = " · CRITICAL" if window.used_percent >= 95 else " · WARNING" if window.used_percent >= 80 else ""
         line += f" {progress_bar(window.used_percent)}{severity}"
     lines = [line]
     reset = reset_text(window.reset_at, now)
@@ -330,17 +330,18 @@ def format_window(window: UsageWindow, now: datetime) -> list[str]:
 def format_provider(result: ProviderResult, now: datetime) -> str:
     lines = [result.label]
     if result.error:
-        lines.append(f"  Fehler: {result.error}.")
+        lines.append(f"  Error: {result.error}.")
         if result.key == "copilot":
-            lines.append("  Hinweis: Lokale Anmeldung mit `gh auth login` prüfen.")
+            lines.append("  Hint: check the local login with `gh auth login`.")
         else:
-            lines.append(f"  Hinweis: Lokale Anmeldung mit `{result.key} login` prüfen.")
+            lines.append(f"  Hint: check the local login with `{result.key} login`.")
     else:
         windows = result.windows if result.key in {"codex1", "codex2"} else tuple(
             window for window in result.windows if window.id == "premium_interactions"
         )
         if not windows:
-            lines.append("  Keine aktiven Limits gemeldet.")
+            label = "premium interactions" if result.key == "copilot" else "limits"
+            lines.append(f"  No active {label} reported.")
         else:
             for window in windows:
                 lines.extend(format_window(window, now))
@@ -349,8 +350,8 @@ def format_provider(result: ProviderResult, now: datetime) -> str:
 
 def poll_and_print(codex1_home: Path, codex2_home: Path, timeout: float, interval: float) -> None:
     now = datetime.now().astimezone()
-    print(f"\nKI-Limits · {now:%d.%m.%Y %H:%M:%S %Z}")
-    print(f"Status aktualisiert · nächste Abfrage in {interval:g} s · drei Requests parallel …", flush=True)
+    print(f"\nAI limits · {now:%Y-%m-%d %H:%M:%S %Z}")
+    print(f"Status updated · next check in {interval:g} s · three requests in parallel ...", flush=True)
 
     jobs = {
         "copilot": ("GitHub Copilot", lambda: collect_copilot(timeout)),
@@ -366,7 +367,7 @@ def poll_and_print(codex1_home: Path, codex2_home: Path, timeout: float, interva
             try:
                 result = future.result()
             except Exception:
-                result = ProviderResult(key, label, (), "", "unerwarteter Fehler bei der Abfrage")
+                result = ProviderResult(key, label, (), "", "unexpected error during the request")
             results[key] = result
 
     # Keep the output stable even though the HTTP calls finish at different
@@ -381,32 +382,32 @@ def poll_and_print(codex1_home: Path, codex2_home: Path, timeout: float, interva
 def positive_float(value: str) -> float:
     parsed = float(value)
     if parsed <= 0:
-        raise argparse.ArgumentTypeError("muss größer als 0 sein")
+        raise argparse.ArgumentTypeError("must be greater than 0")
     return parsed
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Fragt Copilot, Codex 1 und Codex 2 direkt nach ihren Usage-Limits."
+        description="Read usage limits for Copilot, Codex 1, and Codex 2."
     )
     parser.add_argument(
         "--interval",
         type=positive_float,
         default=DEFAULT_INTERVAL,
-        metavar="SEKUNDEN",
-        help=f"Pause zwischen Abfragen (Standard: {DEFAULT_INTERVAL:g})",
+        metavar="SECONDS",
+        help=f"seconds between checks (default: {DEFAULT_INTERVAL:g})",
     )
     parser.add_argument(
         "--timeout",
         type=positive_float,
         default=DEFAULT_TIMEOUT,
-        metavar="SEKUNDEN",
-        help=f"Timeout pro HTTP-/Login-Abfrage (Standard: {DEFAULT_TIMEOUT:g})",
+        metavar="SECONDS",
+        help=f"timeout for each HTTP/login request (default: {DEFAULT_TIMEOUT:g})",
     )
     parser.add_argument(
         "--once",
         action="store_true",
-        help="Nur einmal abfragen und danach beenden",
+        help="run one check and exit",
     )
     return parser
 
@@ -416,7 +417,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     codex1_home = profile_home("CODEX1_HOME", ".codex-account1")
     codex2_home = profile_home("CODEX2_HOME", ".codex-account2")
 
-    print("AI-Statusmonitor gestartet · Ctrl-C zum Beenden", flush=True)
+    print("AI status monitor started · Ctrl-C to exit", flush=True)
     try:
         while True:
             started = time.monotonic()
@@ -427,7 +428,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             if remaining > 0:
                 time.sleep(remaining)
     except KeyboardInterrupt:
-        print("\nBeendet.")
+        print("\nDone.")
         return 0
 
 
