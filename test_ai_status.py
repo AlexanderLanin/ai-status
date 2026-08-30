@@ -8,6 +8,7 @@ from ai_status import (
     parse_copilot_usage,
     progress_bar,
     reset_text,
+    select_providers,
 )
 
 
@@ -79,6 +80,18 @@ class AiStatusTests(unittest.TestCase):
             reset_text("2026-08-30T14:18:15Z", now),
             "In 2 hr. · 18 min.",
         )
+
+    def test_selects_requested_providers(self):
+        self.assertEqual(
+            select_providers(["codex1", "copilot"]),
+            ("codex1", "copilot"),
+        )
+        self.assertEqual(
+            select_providers([]),
+            ("codex1", "codex2", "copilot"),
+        )
+        with self.assertRaisesRegex(ValueError, "unknown provider"):
+            select_providers(["claude"])
 
 
 if __name__ == "__main__":

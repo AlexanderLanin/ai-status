@@ -3,23 +3,23 @@
 Small command line tool for AI usage limits. It checks Codex 1, Codex 2, and GitHub Copilot in parallel every 30 seconds.
 
 ```bash
-python3 ai_status.py
+python3 ai_status.py codex1 codex2 copilot
 ```
 
 Or run it directly from this folder:
 
 ```bash
-./ai-status
+./ai-status codex1 codex2 copilot
 ```
 
-The default Codex profile paths are `~/.codex-account1` and `~/.codex-account2`. You can change them with `CODEX1_HOME` and `CODEX2_HOME`.
+The names select the providers to check. Supported names are `codex1`, `codex2`, and `copilot`. If you give no names, all three are checked. The default Codex profile paths are `~/.codex-account1` and `~/.codex-account2`. You can change them with `CODEX1_HOME` and `CODEX2_HOME`.
 
 ## Run from GitHub with uvx
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) first. Then run the public repository directly:
 
 ```bash
-uvx --from git+https://github.com/AlexanderLanin/ai-status.git ai-status
+uvx --from git+https://github.com/AlexanderLanin/ai-status.git ai-status codex1 codex2 copilot
 ```
 
 `uvx` builds the package in a temporary environment and runs it. The monitor keeps running until you press `Ctrl-C`.
@@ -30,7 +30,7 @@ Example output:
 AI status monitor started · Ctrl-C to exit
 
 AI limits · 2026-08-30 15:15:20 CEST
-Status updated · next check in 30 s · three requests in parallel ...
+Status updated · next check in 30 s · selected providers checked in parallel ...
 
 Codex 1
   5-hour limit              24 / 100 % [#####---------------] · In 52 min. · 0 sec.

@@ -25,6 +25,7 @@ from urllib.request import Request, urlopen
 
 POLL_INTERVAL_SECONDS = 30.0
 REQUEST_TIMEOUT_SECONDS = 10.0
+PROVIDER_ORDER = ("codex1", "codex2", "copilot")
 
 CODEX_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage"
 CODEX_DASHBOARD_URL = "https://chatgpt.com/codex"
@@ -347,16 +348,28 @@ def format_provider(result: ProviderResult, now: datetime) -> str:
     return "\n".join(lines)
 
 
-def poll_and_print(codex1_home: Path, codex2_home: Path) -> None:
+def select_providers(arguments: list[str]) -> tuple[str, ...]:
+    if not arguments:
+        return PROVIDER_ORDER
+
+    unknown = [argument for argument in arguments if argument not in PROVIDER_ORDER]
+    if unknown:
+        names = ", ".join(unknown)
+        raise ValueError(f"unknown provider: {names}; use codex1, codex2, or copilot")
+    requested = set(arguments)
+    return tuple(key for key in PROVIDER_ORDER if key in requested)
+
+
+def poll_and_print(codex1_home: Path, codex2_home: Path, providers: tuple[str, ...]) -> None:
     now = datetime.now().astimezone()
     print(f"\nAI limits · {now:%Y-%m-%d %H:%M:%S %Z}")
     print(
         f"Status updated · next check in {POLL_INTERVAL_SECONDS:g} s · "
-        "three requests in parallel ...",
+        "selected providers checked in parallel ...",
         flush=True,
     )
 
-    jobs = {
+    all_jobs = {
         "copilot": ("GitHub Copilot", lambda: collect_copilot(REQUEST_TIMEOUT_SECONDS)),
         "codex1": (
             "OpenAI Codex 1",
@@ -367,6 +380,7 @@ def poll_and_print(codex1_home: Path, codex2_home: Path) -> None:
             lambda: collect_codex("codex2", "Codex 2", codex2_home, REQUEST_TIMEOUT_SECONDS),
         ),
     }
+    jobs = {key: all_jobs[key] for key in providers}
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = {executor.submit(job): key for key, (_, job) in jobs.items()}
         results: dict[str, ProviderResult] = {}
@@ -381,14 +395,19 @@ def poll_and_print(codex1_home: Path, codex2_home: Path) -> None:
 
     # Keep the output stable even though the HTTP calls finish at different
     # times.  That makes repeated 30-second snapshots easy to scan.
-    for key in ("codex1", "codex2", "copilot"):
-        if key in results:
-            print(format_provider(results[key], now))
-            print()
+    for key in providers:
+        print(format_provider(results[key], now))
+        print()
     sys.stdout.flush()
 
 
 def main() -> int:
+    try:
+        providers = select_providers(sys.argv[1:])
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
     codex1_home = profile_home("CODEX1_HOME", ".codex-account1")
     codex2_home = profile_home("CODEX2_HOME", ".codex-account2")
 
@@ -396,7 +415,7 @@ def main() -> int:
     try:
         while True:
             started = time.monotonic()
-            poll_and_print(codex1_home, codex2_home)
+            poll_and_print(codex1_home, codex2_home, providers)
             remaining = POLL_INTERVAL_SECONDS - (time.monotonic() - started)
             if remaining > 0:
                 time.sleep(remaining)
