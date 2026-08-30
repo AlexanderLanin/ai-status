@@ -22,20 +22,26 @@ python3 ai_status.py --once
 
 ## Run from GitHub with uvx
 
-You need [uv](https://docs.astral.sh/uv/) installed. You can run the tool directly from GitHub without cloning the repository:
+You need [uv](https://docs.astral.sh/uv/) installed. This repository is private, so use your GitHub SSH access to run it directly without cloning the repository:
 
 ```bash
-uvx --from git+https://github.com/AlexanderLanin/ai-status ai-status
+uvx --from git+ssh://git@github.com/AlexanderLanin/ai-status.git ai-status
 ```
 
 Run one check or use a custom interval:
 
 ```bash
-uvx --from git+https://github.com/AlexanderLanin/ai-status ai-status --once
-uvx --from git+https://github.com/AlexanderLanin/ai-status ai-status --interval 60 --timeout 15
+uvx --from git+ssh://git@github.com/AlexanderLanin/ai-status.git ai-status --once
+uvx --from git+ssh://git@github.com/AlexanderLanin/ai-status.git ai-status --interval 60 --timeout 15
 ```
 
 `uvx` builds the package from GitHub in a temporary environment and runs the `ai-status` command. It uses the local Codex profiles and the GitHub CLI login of the current user.
+
+If the repository is public, you can use HTTPS instead:
+
+```bash
+uvx --from git+https://github.com/AlexanderLanin/ai-status ai-status
+```
 
 Example output:
 
