@@ -9,14 +9,13 @@ independent from terminal UI behaviour and never prints the credentials.
 
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import socket
 import subprocess
 import sys
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -24,8 +23,8 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-DEFAULT_INTERVAL = 30.0
-DEFAULT_TIMEOUT = 10.0
+POLL_INTERVAL_SECONDS = 30.0
+REQUEST_TIMEOUT_SECONDS = 10.0
 
 CODEX_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage"
 CODEX_DASHBOARD_URL = "https://chatgpt.com/codex"
@@ -348,15 +347,25 @@ def format_provider(result: ProviderResult, now: datetime) -> str:
     return "\n".join(lines)
 
 
-def poll_and_print(codex1_home: Path, codex2_home: Path, timeout: float, interval: float) -> None:
+def poll_and_print(codex1_home: Path, codex2_home: Path) -> None:
     now = datetime.now().astimezone()
     print(f"\nAI limits · {now:%Y-%m-%d %H:%M:%S %Z}")
-    print(f"Status updated · next check in {interval:g} s · three requests in parallel ...", flush=True)
+    print(
+        f"Status updated · next check in {POLL_INTERVAL_SECONDS:g} s · "
+        "three requests in parallel ...",
+        flush=True,
+    )
 
     jobs = {
-        "copilot": ("GitHub Copilot", lambda: collect_copilot(timeout)),
-        "codex1": ("OpenAI Codex 1", lambda: collect_codex("codex1", "Codex 1", codex1_home, timeout)),
-        "codex2": ("OpenAI Codex 2", lambda: collect_codex("codex2", "Codex 2", codex2_home, timeout)),
+        "copilot": ("GitHub Copilot", lambda: collect_copilot(REQUEST_TIMEOUT_SECONDS)),
+        "codex1": (
+            "OpenAI Codex 1",
+            lambda: collect_codex("codex1", "Codex 1", codex1_home, REQUEST_TIMEOUT_SECONDS),
+        ),
+        "codex2": (
+            "OpenAI Codex 2",
+            lambda: collect_codex("codex2", "Codex 2", codex2_home, REQUEST_TIMEOUT_SECONDS),
+        ),
     }
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = {executor.submit(job): key for key, (_, job) in jobs.items()}
@@ -379,41 +388,7 @@ def poll_and_print(codex1_home: Path, codex2_home: Path, timeout: float, interva
     sys.stdout.flush()
 
 
-def positive_float(value: str) -> float:
-    parsed = float(value)
-    if parsed <= 0:
-        raise argparse.ArgumentTypeError("must be greater than 0")
-    return parsed
-
-
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Read usage limits for Copilot, Codex 1, and Codex 2."
-    )
-    parser.add_argument(
-        "--interval",
-        type=positive_float,
-        default=DEFAULT_INTERVAL,
-        metavar="SECONDS",
-        help=f"seconds between checks (default: {DEFAULT_INTERVAL:g})",
-    )
-    parser.add_argument(
-        "--timeout",
-        type=positive_float,
-        default=DEFAULT_TIMEOUT,
-        metavar="SECONDS",
-        help=f"timeout for each HTTP/login request (default: {DEFAULT_TIMEOUT:g})",
-    )
-    parser.add_argument(
-        "--once",
-        action="store_true",
-        help="run one check and exit",
-    )
-    return parser
-
-
-def main(argv: Sequence[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+def main() -> int:
     codex1_home = profile_home("CODEX1_HOME", ".codex-account1")
     codex2_home = profile_home("CODEX2_HOME", ".codex-account2")
 
@@ -421,10 +396,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         while True:
             started = time.monotonic()
-            poll_and_print(codex1_home, codex2_home, args.timeout, args.interval)
-            if args.once:
-                return 0
-            remaining = args.interval - (time.monotonic() - started)
+            poll_and_print(codex1_home, codex2_home)
+            remaining = POLL_INTERVAL_SECONDS - (time.monotonic() - started)
             if remaining > 0:
                 time.sleep(remaining)
     except KeyboardInterrupt:

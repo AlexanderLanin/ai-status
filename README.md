@@ -1,6 +1,6 @@
 # ai-status
 
-Small command line tool for AI usage limits. It uses the same direct usage checks as `../home-server`: Codex reads the local `auth.json` files, and Copilot uses the token from `gh auth token`. All three checks run in parallel. The output is updated every 30 seconds.
+Small command line tool for AI usage limits. It checks Codex 1, Codex 2, and GitHub Copilot in parallel every 30 seconds.
 
 ```bash
 python3 ai_status.py
@@ -14,34 +14,15 @@ Or run it directly from this folder:
 
 The default Codex profile paths are `~/.codex-account1` and `~/.codex-account2`. You can change them with `CODEX1_HOME` and `CODEX2_HOME`.
 
-Run one check only:
-
-```bash
-python3 ai_status.py --once
-```
-
 ## Run from GitHub with uvx
 
-You need [uv](https://docs.astral.sh/uv/) installed. This repository is private, so use your GitHub SSH access to run it directly without cloning the repository:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) first. Then run the public repository directly:
 
 ```bash
-uvx --from git+ssh://git@github.com/AlexanderLanin/ai-status.git ai-status
+uvx --from git+https://github.com/AlexanderLanin/ai-status.git ai-status
 ```
 
-Run one check or use a custom interval:
-
-```bash
-uvx --from git+ssh://git@github.com/AlexanderLanin/ai-status.git ai-status --once
-uvx --from git+ssh://git@github.com/AlexanderLanin/ai-status.git ai-status --interval 60 --timeout 15
-```
-
-`uvx` builds the package from GitHub in a temporary environment and runs the `ai-status` command. It uses the local Codex profiles and the GitHub CLI login of the current user.
-
-If the repository is public, you can use HTTPS instead:
-
-```bash
-uvx --from git+https://github.com/AlexanderLanin/ai-status ai-status
-```
+`uvx` builds the package in a temporary environment and runs it. The monitor keeps running until you press `Ctrl-C`.
 
 Example output:
 
@@ -61,13 +42,6 @@ Codex 2
 
 GitHub Copilot
   Premium interactions     25,000 / 25,000 Credits [####################] · CRITICAL · In 1 day · 8 hr.
-```
-
-Options:
-
-```text
---interval SECONDS      seconds between checks (default: 30)
---timeout SECONDS       timeout for each HTTP/login request (default: 10)
 ```
 
 Like the web app, Copilot shows only `Premium interactions`. Codex shows the 5-hour and weekly limits with usage, a progress bar, and the time until reset on the same line. Providers are always printed in the same order, so 30-second snapshots are easy to compare. Tokens are used only in memory for the request. They are never printed or saved.
