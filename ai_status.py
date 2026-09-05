@@ -13,7 +13,7 @@ import time
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -22,6 +22,7 @@ POLL_INTERVAL_SECONDS = 30.0
 REQUEST_TIMEOUT_SECONDS = 10.0
 
 CODEX_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage"
+CODEX_RESET_CREDITS_URL = "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits"
 COPILOT_USAGE_URL = "https://api.github.com/copilot_internal/user"
 CODEX_HOME_PATTERN = re.compile(
     r"CODEX_HOME\s*=\s*(?:\"([^\"]+)\"|'([^']+)'|([^\s;]+))"
@@ -56,6 +57,8 @@ class UsageResult:
     target: Target
     windows: tuple[UsageWindow, ...] = ()
     error: str | None = None
+    available_resets: int | None = None
+    next_reset_expires_at: str | None = None
 
 
 def as_record(value: object) -> dict[str, object] | None:
@@ -114,6 +117,41 @@ def parse_codex_usage(data: object) -> list[UsageWindow]:
             )
         )
     return windows
+
+
+def parse_codex_available_resets(data: object) -> int | None:
+    root = as_record(data)
+    reset_credits = as_record(root.get("rate_limit_reset_credits") if root else None)
+    if reset_credits is None:
+        return None
+    available_count = reset_credits.get("available_count")
+    if isinstance(available_count, bool) or not isinstance(available_count, int) or available_count < 0:
+        raise StatusError("Codex reset credits are invalid")
+    return available_count
+
+
+def parse_codex_reset_expiry(data: object) -> str | None:
+    """Return the earliest expiry of an available Codex reset credit."""
+    root = as_record(data)
+    credits = root.get("credits") if root else None
+    if not isinstance(credits, list):
+        raise StatusError("Codex reset credit details are invalid")
+
+    expiries: list[tuple[datetime, str]] = []
+    for raw_credit in credits:
+        credit = as_record(raw_credit)
+        if credit is None:
+            continue
+        status = credit.get("status")
+        if status is not None and status != "available":
+            continue
+        expires_at = credit.get("expires_at")
+        if not isinstance(expires_at, str):
+            continue
+        expiry = reset_datetime(expires_at)
+        if expiry is not None:
+            expiries.append((expiry, expires_at))
+    return min(expiries)[1] if expiries else None
 
 
 def parse_copilot_usage(data: object) -> list[UsageWindow]:
@@ -266,8 +304,28 @@ def collect_codex(target: Target) -> UsageResult:
         }
         if account_id:
             headers["ChatGPT-Account-Id"] = account_id
-        windows = tuple(parse_codex_usage(fetch_json(CODEX_USAGE_URL, headers)))
-        return UsageResult(target, windows)
+        data = fetch_json(CODEX_USAGE_URL, headers)
+        windows = tuple(parse_codex_usage(data))
+        available_resets = parse_codex_available_resets(data)
+        next_reset_expires_at = None
+        if available_resets:
+            reset_headers = {
+                **headers,
+                "OpenAI-Beta": "codex-1",
+                "originator": "Codex Desktop",
+            }
+            try:
+                reset_details = fetch_json(CODEX_RESET_CREDITS_URL, reset_headers)
+                next_reset_expires_at = parse_codex_reset_expiry(reset_details)
+            except StatusError:
+                # Keep the usage result visible when the optional details request fails.
+                pass
+        return UsageResult(
+            target,
+            windows,
+            available_resets=available_resets,
+            next_reset_expires_at=next_reset_expires_at,
+        )
     except StatusError as exc:
         return UsageResult(target, error=str(exc))
 
@@ -353,6 +411,19 @@ def reset_text(value: str | None, now: datetime) -> str | None:
     return f"In {days:02d}d {hours:02d}h {minutes:02d}m {seconds:02d}s"
 
 
+def reset_expiry_text(value: str | None, now: datetime) -> str | None:
+    if not value:
+        return None
+    expiry = reset_datetime(value)
+    if expiry is None:
+        return None
+    countdown = reset_text(value, now)
+    if countdown is None:
+        return None
+    warning = " · WARNING: expires in less than 7 days" if expiry - now < timedelta(days=7) else ""
+    return f"{countdown}{warning}"
+
+
 def progress_bar(percent: float) -> str:
     width = 20
     filled = round(clamp_percent(percent) / 100.0 * width)
@@ -378,6 +449,12 @@ def format_result(result: UsageResult, now: datetime) -> str:
     if result.error:
         lines.append(f"  Error: {result.error}.")
         return "\n".join(lines)
+    if result.target.provider == "codex" and result.available_resets is not None:
+        reset_line = f"  Quota resets available: {result.available_resets}"
+        expiry = reset_expiry_text(result.next_reset_expires_at, now)
+        if expiry:
+            reset_line += f" · Next expiry: {expiry}"
+        lines.append(reset_line)
     if not result.windows:
         lines.append("  No usage limits reported.")
         return "\n".join(lines)

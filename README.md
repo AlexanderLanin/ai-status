@@ -31,10 +31,12 @@ AI status monitor started · Ctrl-C to exit
 AI limits · 2026-08-30 15:15:20 CEST
 
 [codex1] · Codex
+  Quota resets available: 2 · Next expiry: In 04d 00h 00m 00s · WARNING: expires in less than 7 days
   5-hour limit             24 / 100 % [#####---------------] · In 00d 00h 52m 00s
   Weekly limit              4 / 100 % [#-------------------] · In 06d 19h 00m 00s
 
 [codex2] · Codex
+  Quota resets available: 0
   5-hour limit              0 / 100 % [--------------------] · In 00d 02h 27m 00s
   Weekly limit               0 / 100 % [--------------------] · In 06d 21h 00m 00s
 
